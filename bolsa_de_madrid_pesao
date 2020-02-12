@@ -1,0 +1,38 @@
+import pandas as pd
+import requests
+import bs4
+from sqlalchemy import create_engine
+
+conn = create_engine('postgresql+psycopg2://postgres:cristo@bdiez.duckdns.org:6543/postgres')
+
+resp = requests.get('http://www.bolsamadrid.es/esp/aspx/Mercados/Precios.aspx?indice=ESI100000000')
+print(resp)  # si da 200 es ok
+
+# lxml es un parse, como html.parser y html5lib
+soup = bs4.BeautifulSoup(resp.text, 'lxml')
+
+table_id = soup.find('table', {'id': 'ctl00_Contenido_tblAcciones'})
+# 'table class -> table-bordered table-hover table-striped'
+row = table_id.findAll('tr')
+
+
+nombres = [rows.findAll('td')[0].text for rows in row[1:]]
+cierres = [rows.findAll('td')[1].text for rows in row[1:]]
+diferencia = [rows.findAll('td')[2].text for rows in row[1:]]
+maximo = [rows.findAll('td')[3].text for rows in row[1:]]
+minimo = [rows.findAll('td')[4].text for rows in row[1:]]
+volumen = [rows.findAll('td')[5].text for rows in row[1:]]
+efectivo = [rows.findAll('td')[6].text for rows in row[1:]]
+
+df = pd.DataFrame()
+df['nombres'] = nombres
+df['cierres'] = cierres
+df['dif_porcentaje'] = diferencia  # el % no te lo admite como nombre de columna
+df['maximo'] = maximo
+df['minimo'] = minimo
+df['volumen'] = volumen
+df['efectivo'] = efectivo
+
+print(df)
+df.to_sql(name='cierre_ibex', con=conn, if_exists='replace', index=True, index_label=None, method=None)
+df.to_csv('cierre_ibex.csv')
